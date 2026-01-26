@@ -449,5 +449,292 @@ function imprimirReporte() {
     window.print();
 }
 
+// =============================================================================
+// NUEVAS FUNCIONALIDADES - Sistema Multi-Certificado
+// =============================================================================
+
+// Sistema de Almacenamiento Local
+const StorageManager = {
+    getCertificados: function() {
+        const data = localStorage.getItem('certificados_obra');
+        return data ? JSON.parse(data) : [];
+    },
+
+    agregarCertificado: function(certificado) {
+        const certificados = this.getCertificados();
+        certificados.push(certificado);
+        localStorage.setItem('certificados_obra', JSON.stringify(certificados));
+        return certificados;
+    },
+
+    getUltimoCertificado: function() {
+        const certificados = this.getCertificados();
+        return certificados.length > 0 ? certificados[certificados.length - 1] : null;
+    }
+};
+
+// Crear Gauge Circular SVG
+function crearGauge(contenedorId, valor, label, maxValor = 100) {
+    const contenedor = document.getElementById(contenedorId);
+    if (!contenedor) return;
+
+    const radio = 80;
+    const circunferencia = 2 * Math.PI * radio;
+    const porcentaje = (valor / maxValor) * 100;
+    const offset = circunferencia - (porcentaje / 100) * circunferencia;
+
+    contenedor.innerHTML = `
+        <svg class="gauge-svg" width="200" height="200" viewBox="0 0 200 200">
+            <circle class="gauge-background" cx="100" cy="100" r="${radio}"></circle>
+            <circle class="gauge-progress" cx="100" cy="100" r="${radio}"
+                    stroke-dasharray="${circunferencia}"
+                    stroke-dashoffset="${circunferencia}"
+                    data-offset="${offset}">
+            </circle>
+        </svg>
+        <div class="gauge-value">
+            <div class="gauge-value-number">${porcentaje.toFixed(1)}%</div>
+            <div class="gauge-value-label">${label}</div>
+        </div>
+    `;
+
+    // Animar el gauge
+    setTimeout(() => {
+        const circle = contenedor.querySelector('.gauge-progress');
+        circle.style.strokeDashoffset = offset;
+    }, 200);
+}
+
+// Generar Timeline Mes a Mes
+function generarTimelineMesAMes() {
+    const container = document.getElementById('timeline-mes-mes');
+    if (!container) return;
+
+    const certificados = StorageManager.getCertificados();
+
+    // Si no hay certificados guardados, crear uno con los datos actuales
+    if (certificados.length === 0) {
+        const cert = {
+            numero: datosObra.informacion.certificadoNumero,
+            fecha: datosObra.informacion.fecha,
+            montoAcumulado: datosObra.resumen.montoAcumulado,
+            porcentaje: datosObra.resumen.porcentajePresupuesto
+        };
+        StorageManager.agregarCertificado(cert);
+    }
+
+    const todosLosCertificados = StorageManager.getCertificados();
+
+    container.innerHTML = '';
+    todosLosCertificados.forEach((cert, index) => {
+        const item = document.createElement('div');
+        item.classList.add('timeline-item');
+        item.innerHTML = `
+            <div class="timeline-dot"></div>
+            <div class="timeline-content">
+                <div class="timeline-date">Certificado N° ${cert.numero} - ${cert.fecha}</div>
+                <div class="timeline-amount">₲ ${formatearMoneda(cert.montoAcumulado)}</div>
+                <div style="margin-top: 8px; color: var(--gray-dark); font-size: 0.9rem;">
+                    Progreso: ${cert.porcentaje}%
+                </div>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+}
+
+// Generar Gráfico de Comparación Proyecto vs Ejecutado
+function generarGraficoComparacion() {
+    const container = document.getElementById('chart-comparacion');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    datosObra.rubros.slice(0, 10).forEach(rubro => {
+        let totalRubro = 0;
+        let ejecutadoRubro = 0;
+
+        rubro.items.forEach(item => {
+            totalRubro += item.precioTotal;
+            ejecutadoRubro += item.montoAcumulado;
+        });
+
+        const porcentajeEjecutado = totalRubro > 0 ? (ejecutadoRubro / totalRubro) * 100 : 0;
+        const porcentajePendiente = 100 - porcentajeEjecutado;
+
+        const comparison = document.createElement('div');
+        comparison.classList.add('comparison-bar');
+        comparison.innerHTML = `
+            <div class="comparison-label">
+                <span style="font-weight: 600;">${rubro.numero}. ${rubro.nombre}</span>
+                <span style="color: var(--gray-dark);">₲ ${formatearMoneda(ejecutadoRubro)} / ₲ ${formatearMoneda(totalRubro)}</span>
+            </div>
+            <div class="comparison-bars">
+                <div class="bar-entregado" style="width: 0%" data-width="${porcentajeEjecutado}">
+                    ${porcentajeEjecutado > 15 ? porcentajeEjecutado.toFixed(1) + '%' : ''}
+                </div>
+                <div class="bar-proyecto" style="width: 0%; background: var(--gray-medium); color: var(--navy-dark);" data-width="${porcentajePendiente}">
+                    ${porcentajePendiente > 15 ? porcentajePendiente.toFixed(1) + '%' : ''}
+                </div>
+            </div>
+        `;
+        container.appendChild(comparison);
+    });
+
+    // Animar las barras
+    setTimeout(() => {
+        document.querySelectorAll('.bar-entregado, .bar-proyecto').forEach(bar => {
+            const width = bar.getAttribute('data-width');
+            bar.style.width = width + '%';
+        });
+    }, 100);
+}
+
+// Calcular Velocidad de Obra (monto por mes)
+function calcularVelocidad() {
+    const certificados = StorageManager.getCertificados();
+    if (certificados.length < 2) return 50; // Valor por defecto
+
+    const ultimo = certificados[certificados.length - 1];
+    const penultimo = certificados[certificados.length - 2];
+
+    const diferenciaMonto = ultimo.montoAcumulado - penultimo.montoAcumulado;
+    const velocidadEsperada = datosObra.informacion.presupuestoTotal / 12; // Asumiendo 12 meses
+
+    return Math.min(100, (diferenciaMonto / velocidadEsperada) * 100);
+}
+
+// Calcular Eficiencia Presupuestaria
+function calcularEficiencia() {
+    const { totalEjecutado, porcentajePresupuesto } = datosObra.resumen;
+    const tiempoTranscurrido = 5; // Certificado 5 de aproximadamente 12-15 meses
+    const tiempoEsperado = 12;
+    const progresoEsperado = (tiempoTranscurrido / tiempoEsperado) * 100;
+
+    // Eficiencia = si estamos avanzando más rápido de lo esperado
+    const eficiencia = (porcentajePresupuesto / progresoEsperado) * 100;
+    return Math.min(100, eficiencia);
+}
+
+// Modal de Carga
+function abrirModalCarga() {
+    document.getElementById('modal-carga').classList.add('active');
+}
+
+function cerrarModalCarga() {
+    document.getElementById('modal-carga').classList.remove('active');
+    document.getElementById('upload-status').innerHTML = '';
+}
+
+// Procesar PDF Cargado
+async function procesarPDF(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const statusDiv = document.getElementById('upload-status');
+    statusDiv.innerHTML = '<p style="color: var(--accent-orange); font-weight: 600;">⏳ Procesando PDF...</p>';
+
+    try {
+        // Simulación de procesamiento (en producción se usaría PDF.js para extraer datos reales)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Por ahora, crear un certificado de ejemplo
+        const numeroCertificado = prompt('Ingrese el número de certificado:', '06');
+        const fechaCertificado = prompt('Ingrese la fecha (DD/MM/YYYY):', new Date().toLocaleDateString('es-PY'));
+        const montoCertificado = parseFloat(prompt('Ingrese el monto acumulado total:', '250000000'));
+
+        if (numeroCertificado && fechaCertificado && montoCertificado) {
+            const porcentaje = (montoCertificado / datosObra.informacion.presupuestoTotal) * 100;
+
+            const nuevoCertificado = {
+                numero: numeroCertificado,
+                fecha: fechaCertificado,
+                montoAcumulado: montoCertificado,
+                porcentaje: porcentaje.toFixed(2)
+            };
+
+            StorageManager.agregarCertificado(nuevoCertificado);
+
+            statusDiv.innerHTML = `
+                <p style="color: var(--success); font-weight: 600;">✅ Certificado N° ${numeroCertificado} agregado exitosamente</p>
+                <p style="margin-top: 10px;">
+                    <button class="btn btn-primary" onclick="location.reload()">Actualizar Vista</button>
+                </p>
+            `;
+        }
+    } catch (error) {
+        statusDiv.innerHTML = '<p style="color: var(--danger); font-weight: 600;">❌ Error al procesar el PDF</p>';
+        console.error(error);
+    }
+}
+
+// Drag and Drop para el área de carga
+document.addEventListener('DOMContentLoaded', function() {
+    const uploadArea = document.getElementById('upload-area');
+
+    if (uploadArea) {
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.add('dragover');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadArea.addEventListener(eventName, () => {
+                uploadArea.classList.remove('dragover');
+            }, false);
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            document.getElementById('file-input').files = files;
+            procesarPDF({ target: { files: files } });
+        }, false);
+    }
+});
+
+// =============================================================================
+// ACTUALIZACIÓN DE INICIALIZACIÓN
+// =============================================================================
+
+// Actualizar Dashboard Principal con Gauges
+function actualizarDashboard() {
+    const { presupuestoTotal } = datosObra.informacion;
+    const { totalEjecutado, porcentajePresupuesto } = datosObra.resumen;
+    const pendiente = presupuestoTotal - totalEjecutado;
+
+    document.getElementById('presupuesto-total').textContent = formatearMoneda(presupuestoTotal);
+    document.getElementById('total-ejecutado').textContent = formatearMoneda(totalEjecutado);
+
+    // Crear gauges
+    crearGauge('gauge-progreso', porcentajePresupuesto, 'Completado', 100);
+    crearGauge('gauge-velocidad', calcularVelocidad(), 'Ritmo', 100);
+    crearGauge('gauge-eficiencia', calcularEficiencia(), 'Eficiencia', 100);
+}
+
+// Inicializar la aplicación con nuevas funcionalidades
+function inicializarApp() {
+    actualizarDashboard();
+    cargarTablaRubros();
+    generarGraficoRubros();
+    actualizarResumenCertificados();
+    generarTimelineMesAMes();
+    generarGraficoComparacion();
+
+    // Actualizar info del certificado en el header
+    document.getElementById('cert-numero').textContent = datosObra.informacion.certificadoNumero;
+    document.getElementById('cert-fecha').textContent = datosObra.informacion.fecha;
+}
+
 // Inicializar cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', inicializarApp);

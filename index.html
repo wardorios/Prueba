@@ -11,37 +11,67 @@
         <!-- Header -->
         <header class="header">
             <div class="header-content">
-                <h1>🏗️ Monitor de Avance de Obra</h1>
+                <h1>Monitor de Avance de Obra</h1>
                 <div class="obra-info">
                     <h2>Vivienda Unifamiliar - Abel Rios y Alba Velazquez</h2>
                     <p>📍 Condominio Costa Del Lago - Hernandarias</p>
-                    <p>📅 Certificado N° 05 - 29/12/2025</p>
+                    <p>📅 Último Certificado: N° <span id="cert-numero">05</span> - <span id="cert-fecha">29/12/2025</span></p>
                 </div>
+            </div>
+            <div class="header-branding">
+                <p class="logo-text">engenhaBIM</p>
+                <p style="font-size: 0.8rem; color: var(--gray-dark);">Proyectos e Treinamentos</p>
             </div>
         </header>
 
-        <!-- Dashboard Principal -->
+        <!-- Dashboard Principal con Gauges -->
         <section class="dashboard">
-            <div class="card card-presupuesto">
-                <h3>💰 Presupuesto Total</h3>
-                <p class="big-number">₲ <span id="presupuesto-total">1.040.000.000</span></p>
+            <div class="card card-progreso">
+                <h3>Progreso General</h3>
+                <div class="gauge-container" id="gauge-progreso">
+                    <!-- Se generará con JavaScript -->
+                </div>
             </div>
 
             <div class="card card-ejecutado">
-                <h3>✅ Total Ejecutado</h3>
+                <h3>Total Ejecutado</h3>
                 <p class="big-number">₲ <span id="total-ejecutado">237.666.280</span></p>
+                <p style="font-size: 0.9rem; color: var(--gray-dark); margin-top: 10px;">
+                    de ₲ <span id="presupuesto-total">1.040.000.000</span>
+                </p>
             </div>
 
             <div class="card card-pendiente">
-                <h3>⏳ Pendiente de Ejecutar</h3>
-                <p class="big-number">₲ <span id="pendiente">802.333.720</span></p>
+                <h3>Velocidad de Obra</h3>
+                <div class="gauge-container" id="gauge-velocidad">
+                    <!-- Se generará con JavaScript -->
+                </div>
             </div>
 
             <div class="card card-progreso">
-                <h3>📊 Progreso General</h3>
-                <p class="big-number"><span id="porcentaje-total">22.85</span>%</p>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progress-fill-main"></div>
+                <h3>Eficiencia Presupuestaria</h3>
+                <div class="gauge-container" id="gauge-eficiencia">
+                    <!-- Se generará con JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Evolución Temporal -->
+        <section class="grafico-section">
+            <div class="card">
+                <h3>Evolución Temporal de la Obra</h3>
+                <div id="timeline-mes-mes" class="timeline-container">
+                    <!-- Se generará con JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Comparación Proyecto vs Entregado por Rubro -->
+        <section class="grafico-section">
+            <div class="card">
+                <h3>Comparación: Proyectado vs Ejecutado</h3>
+                <div id="chart-comparacion" class="chart-container">
+                    <!-- Se generará con JavaScript -->
                 </div>
             </div>
         </section>
@@ -49,7 +79,7 @@
         <!-- Gráfico de Progreso por Rubro -->
         <section class="grafico-section">
             <div class="card">
-                <h3>📈 Progreso por Rubro Principal</h3>
+                <h3>Progreso por Rubro Principal</h3>
                 <div id="chart-rubros" class="chart-container"></div>
             </div>
         </section>
@@ -132,6 +162,30 @@
         </footer>
     </div>
 
+    <!-- Botón Flotante para Cargar Nuevo Certificado -->
+    <button class="btn-float" onclick="abrirModalCarga()" title="Cargar Nuevo Certificado">
+        +
+    </button>
+
+    <!-- Modal de Carga de PDF -->
+    <div class="modal-overlay" id="modal-carga">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Cargar Nuevo Certificado</h2>
+                <button class="modal-close" onclick="cerrarModalCarga()">&times;</button>
+            </div>
+            <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+                <div class="upload-icon">📄</div>
+                <p class="upload-text">Arrastra tu certificado PDF aquí</p>
+                <p class="upload-hint">o haz clic para seleccionar un archivo</p>
+                <input type="file" id="file-input" accept=".pdf" onchange="procesarPDF(event)">
+            </div>
+            <div id="upload-status" style="margin-top: 20px; text-align: center;"></div>
+        </div>
+    </div>
+
+    <!-- Librerías -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
